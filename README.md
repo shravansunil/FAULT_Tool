@@ -1,3 +1,5 @@
+Study of FAULT Tool for Scan insertion and ATPG for OpenSource tool-flows  
+
 This repo contains a demonstration of the Fault tool chain, which is a practical open source tool chain for automatic test pattern generation (ATPG), scan insertion and scan chain testing.
 
 We have chosen a simple counter design for the demonstration. 
