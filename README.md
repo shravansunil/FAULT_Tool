@@ -42,20 +42,20 @@ Open the terminal and run the commands in sequence:
 	  docker run -it -v "$(pwd)":/work -w /work ghcr.io/aucohl/fault:latest bash
 
 	This will do the synthesis and generate the gate-level netlist mapping to the osu035 standard cell 	library.
-    read_verilog counter.v \
-  	read_liberty -lib osu035_stdcells.lib \
-  	synth -top counter \
-  	dfflibmap -liberty osu035_stdcells.lib \
-  	abc -liberty osu035_stdcells.lib  \
-  	proc; opt; flatten;  \
-  	opt_clean -purge \                  
-  	write_verilog -noattr counter_trial.v 
+	    read_verilog counter.v \
+	  	read_liberty -lib osu035_stdcells.lib \
+	  	synth -top counter \
+	  	dfflibmap -liberty osu035_stdcells.lib \
+	  	abc -liberty osu035_stdcells.lib  \
+	  	proc; opt; flatten;  \
+	  	opt_clean -purge \                  
+	  	write_verilog -noattr counter_trial.v 
 
 	This will take the netlist and generate a scan inserted netlist named counter_scan1.v. It replaces all 	regular ff with scan ff and also initiates new outputs sout for the scan modes
-    fault cut counter_scan1.v -o counter_scan_cut.v
+    	fault cut counter_scan1.v -o counter_scan_cut.v
 
 	This command will cut the scan chain removing all feedback paths converting the circuit into a set of 	primary inputs and outputs which can be analysed for atpg testing. 
-    fault cut counter_scan1.v --clock clk -o counter_scan_cut.v
+    	fault cut counter_scan1.v --clock clk -o counter_scan_cut.v
 
 	This command will run the ATPG test and generate a patterns.tv.json file which is the test vector 	inputs and a coverage.yml file which will tell the fault coverage percentage 
-    fault --cellModel osu035_stdcells.v --clock clk -o patterns.tv.json --output-covered coverage.yml counter_scan_cut.v
+    	fault --cellModel osu035_stdcells.v --clock clk -o patterns.tv.json --output-covered coverage.yml counter_scan_cut.v
