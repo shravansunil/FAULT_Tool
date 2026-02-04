@@ -59,3 +59,9 @@ Open the terminal and run the commands in sequence:
 
 	#This command will run the ATPG test and generate a patterns.tv.json file which is the test vector 	inputs and a coverage.yml file which will tell the fault coverage percentage 
     	fault --cellModel osu035_stdcells.v --clock clk -o patterns.tv.json --output-covered coverage.yml counter_scan_cut.v
+
+What each of the output files give in detail:
+	coverage.yml: It lists the specific netlist nodes where Stuck-At-0 (sa0) and Stuck-At-1 (sa1) faults were successfully detected along with the coverage percentage, which is 88.88% for this run. 
+	patterns.tv.json: It gives the list of test vectors. A machine readable file containing the stimulus and expected responses ("golden outputs") used for testing.
+	parser.out: It lists the formal rules used to parse the verilog netlist by the tool.
+	
