@@ -1,67 +1,211 @@
-Study of FAULT Tool for Scan insertion and ATPG for OpenSource tool-flows  
+# FAULT Tool — Scan Insertion & ATPG with Open-Source Tool-Flows
 
-This repo contains a demonstration of the Fault tool chain, which is a practical open source tool chain for automatic test pattern generation (ATPG), scan insertion and scan chain testing.
+A demonstration of the **Fault** toolchain for Automatic Test Pattern Generation (ATPG), scan insertion, and scan chain testing, using a simple counter design as the target circuit.
 
-We have chosen a simple counter design for the demonstration. 
+---
 
-The Fault tool can be run in three methods
-	1. Inside a docker container getting the docker image. 
-	2. Using Nix, a declarative utility tool that comes inside the OpenLane project. 
-	3. Installing Fault alone and then building the required dependencies on our own. 
-		Though I used the first method, for the purpose of understanding the toolchain I am listing out		the dependencies that would be required if we were doing it on our own.  
-		Python - A part of the tools build uses Python
-		Icarus Verilog 
-		Yosys - Synthesis tool 
+## Table of Contents
 
-Exact set of commands to run. 
+- [Overview](#overview)
+- [Running Fault — Three Methods](#running-fault--three-methods)
+- [Dependencies (Manual Install)](#dependencies-manual-install)
+- [Step-by-Step Walkthrough](#step-by-step-walkthrough)
+  - [1. Pull the Docker Image](#1-pull-the-docker-image)
+  - [2. Verify Environment](#2-verify-environment)
+  - [3. Create the Design File](#3-create-the-design-file)
+  - [4. Prepare Library Files](#4-prepare-library-files)
+  - [5. Launch the Container](#5-launch-the-container)
+  - [6. Synthesize the Design](#6-synthesize-the-design)
+  - [7. Scan Insertion](#7-scan-insertion)
+  - [8. Cut the Scan Chain](#8-cut-the-scan-chain)
+  - [9. Run ATPG](#9-run-atpg)
+- [Output Files Explained](#output-files-explained)
 
-Getting Fault 
-	
-	docker pull ghcr.io/aucohl/fault:latest
+---
 
-Verify environment setup
+## Overview
 
-	docker run -ti --rm ghcr.io/aucohl/fault:latest fault --version
+This repo demonstrates the **Fault** open-source toolchain, which covers:
 
-Create a file counter.v in working directory
+- Gate-level **synthesis** using Yosys
+- **Scan insertion** — replacing regular flip-flops with scan flip-flops
+- **Scan chain cutting** — converting feedback paths into primary I/O for analysis
+- **ATPG** — generating test vectors and measuring fault coverage
 
-	module counter(input clk, input rst, output reg [3:0] Q);
-	always @(posedge clk) begin
-	if (rst)
-	Q<=0;
-	else
-	Q <= Q + 1;
-	end
-	endmodule
+The design under test is a simple 4-bit counter.
 
-Make sure the lib files are present. osu035_stdlib.v and osu035_stdlib.lib 
+---
 
-Open the terminal and run the commands in sequence:
-	
-	#This will open the container,  drop into a bash shell, and map your current folder so  files remain 
-	  docker run -it -v "$(pwd)":/work -w /work ghcr.io/aucohl/fault:latest bash
+## Running Fault — Three Methods
 
-	#This will do the synthesis and generate the gate-level netlist mapping to the osu035 standard cell 	library.
-	    read_verilog counter.v \
-	  	read_liberty -lib osu035_stdcells.lib \
-	  	synth -top counter \
-	  	dfflibmap -liberty osu035_stdcells.lib \
-	  	abc -liberty osu035_stdcells.lib  \
-	  	proc; opt; flatten;  \
-	  	opt_clean -purge \                  
-	  	write_verilog -noattr counter_trial.v 
+| Method | Description |
+|--------|-------------|
+| **Docker** *(used here)* | Pull and run the pre-built container image — simplest setup |
+| **Nix** | Use the declarative Nix utility bundled inside the OpenLane project |
+| **Manual Install** | Install Fault and build all dependencies yourself |
 
-	#This will take the netlist and generate a scan inserted netlist named counter_scan1.v. It replaces all 	regular ff with scan ff and also initiates new outputs sout for the scan modes
-    	fault cut counter_scan1.v -o counter_scan_cut.v
+---
 
-	#This command will cut the scan chain removing all feedback paths converting the circuit into a set of 	primary inputs and outputs which can be analysed for atpg testing. 
-    	fault cut counter_scan1.v --clock clk -o counter_scan_cut.v
+## Dependencies (Manual Install)
 
-	#This command will run the ATPG test and generate a patterns.tv.json file which is the test vector 	inputs and a coverage.yml file which will tell the fault coverage percentage 
-    	fault --cellModel osu035_stdcells.v --clock clk -o patterns.tv.json --output-covered coverage.yml counter_scan_cut.v
+> Only relevant if you are **not** using Docker or Nix.
 
-What each of the output files give in detail:
-	coverage.yml: It lists the specific netlist nodes where Stuck-At-0 (sa0) and Stuck-At-1 (sa1) faults were successfully detected along with the coverage percentage, which is 88.88% for this run. 
-	patterns.tv.json: It gives the list of test vectors. A machine readable file containing the stimulus and expected responses ("golden outputs") used for testing.
-	parser.out: It lists the formal rules used to parse the verilog netlist by the tool.
-	
+- **Python** — used in parts of the tool's build process
+- **Icarus Verilog** — open-source Verilog simulation and compilation
+- **Yosys** — open-source RTL synthesis suite
+
+---
+
+## Step-by-Step Walkthrough
+
+### 1. Pull the Docker Image
+
+```bash
+docker pull ghcr.io/aucohl/fault:latest
+```
+
+---
+
+### 2. Verify Environment
+
+```bash
+docker run -ti --rm ghcr.io/aucohl/fault:latest fault --version
+```
+
+---
+
+### 3. Create the Design File
+
+Create `counter.v` in your working directory:
+
+```verilog
+module counter(input clk, input rst, output reg [3:0] Q);
+  always @(posedge clk) begin
+    if (rst)
+      Q <= 0;
+    else
+      Q <= Q + 1;
+  end
+endmodule
+```
+
+---
+
+### 4. Prepare Library Files
+
+Ensure the following standard cell library files are present in your working directory:
+
+- `osu035_stdcells.v`
+- `osu035_stdcells.lib`
+
+---
+
+### 5. Launch the Container
+
+This opens an interactive shell inside the container and maps your current folder so all files persist on your host machine:
+
+```bash
+docker run -it -v "$(pwd)":/work -w /work ghcr.io/aucohl/fault:latest bash
+```
+
+---
+
+### 6. Synthesize the Design
+
+Run the following Yosys commands to synthesize `counter.v` and produce a gate-level netlist mapped to the OSU035 standard cell library:
+
+```tcl
+read_verilog counter.v
+read_liberty -lib osu035_stdcells.lib
+synth -top counter
+dfflibmap -liberty osu035_stdcells.lib
+abc -liberty osu035_stdcells.lib
+proc; opt; flatten;
+opt_clean -purge
+write_verilog -noattr counter_trial.v
+```
+
+> **Output:** `counter_trial.v` — the synthesized gate-level netlist.
+
+---
+
+### 7. Scan Insertion
+
+Replace all regular flip-flops with scan flip-flops and introduce a new `sout` port for scan mode:
+
+```bash
+fault scan counter_trial.v -o counter_scan1.v
+```
+
+> **Output:** `counter_scan1.v` — the scan-inserted netlist.
+
+---
+
+### 8. Cut the Scan Chain
+
+Remove all feedback paths, converting the circuit into a set of primary inputs and outputs that can be analysed during ATPG:
+
+```bash
+fault cut counter_scan1.v --clock clk -o counter_scan_cut.v
+```
+
+> **Output:** `counter_scan_cut.v` — the scan-cut netlist, ready for ATPG.
+
+---
+
+### 9. Run ATPG
+
+Generate test vectors and measure fault coverage:
+
+```bash
+fault \
+  --cellModel osu035_stdcells.v \
+  --clock clk \
+  -o patterns.tv.json \
+  --output-covered coverage.yml \
+  counter_scan_cut.v
+```
+
+> **Outputs:** `patterns.tv.json` and `coverage.yml`
+
+---
+
+## Output Files Explained
+
+### `coverage.yml`
+
+Lists every netlist node where **Stuck-At-0 (sa0)** and **Stuck-At-1 (sa1)** faults were successfully detected, along with the overall fault coverage percentage.
+
+> Fault coverage achieved in this run: **88.88%**
+
+---
+
+### `patterns.tv.json`
+
+A machine-readable file containing the complete set of test vectors — stimulus inputs and their corresponding expected ("golden") outputs — used for scan-based testing.
+
+---
+
+### `parser.out`
+
+Lists the formal grammar rules used by the tool to parse the Verilog netlist. Useful for debugging netlist compatibility issues.
+
+---
+
+## Flow Summary
+
+```
+counter.v
+    │
+    ▼  Yosys synthesis
+counter_trial.v  (gate-level netlist)
+    │
+    ▼  fault scan
+counter_scan1.v  (scan flip-flops inserted)
+    │
+    ▼  fault cut
+counter_scan_cut.v  (feedback paths removed)
+    │
+    ▼  fault ATPG
+patterns.tv.json + coverage.yml
+```
